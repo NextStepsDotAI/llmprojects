@@ -36,7 +36,8 @@ function Stop-BackgroundProcess {
         # Clean up the file marker
         Remove-Item $PidFilePath -Force
     } else {
-        Write-Host "⚠ No track file found for $ProcessName ($PidFilePath is absent)." -ForegroundColor Gray
+        # Changed text formatting to avoid string parsing evaluation bugs
+        Write-Host "Notice: No track file found for $ProcessName. Path missing: $PidFilePath" -ForegroundColor Gray
     }
 }
 
