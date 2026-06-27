@@ -6,8 +6,8 @@ $env:PYTHONIOENCODING = "utf-8"
 $env:LC_ALL = "en_US.UTF-8"
 
 # --- Component Runtime Ports ---
-$env:PHOENIX_PORT   = 6006
-$env:LITELLM_PORT   = 4000
+$env:PHOENIX_PORT = 6006
+$env:LITELLM_PORT = 4000
 
 # --- Filepath/Routing Definitions ---
 # Dynamically points everything relative to your project workspace structure

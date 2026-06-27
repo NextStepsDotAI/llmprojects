@@ -57,22 +57,28 @@ $ParentPid = $PID
 $ParentPid | Out-File "$TmpDir\orchestrator.pid" -Encoding ascii
 
 # ========================================================================
-# 3. SPOKE INVOCATIONS WITH HEALTH PROBING
+# 3. SPOKE INVOCATIONS WITH ASYNC BACKGROUND EXECUTION & HEALTH PROBING
 # ========================================================================
-
-# Explicitly load environment definitions first to ensure values exist in the parent loop
+# Load environment into the parent script first so the readiness probes can see the ports
 . "$BinDir\..\config\env.ps1"
 
 # --- Spoke 1: Telemetry Dashboard (Phoenix) ---
-Write-Host "Launching Telemetry Engine..." -ForegroundColor Gray
-& "$BinDir\Run-Phoenix.ps1"
+Write-Host "Launching Telemetry Engine (Background)..." -ForegroundColor Gray
+$PhoenixArgs = "-NoProfile -ExecutionPolicy Bypass -Command `. '$BinDir\..\config\env.ps1'; & '$BinDir\Run-Phoenix.ps1'"
+$PhoenixProc = Start-Process -FilePath "powershell.exe" -ArgumentList $PhoenixArgs -PassThru -WindowStyle Hidden
+$PhoenixProc.Id | Out-File "$TmpDir\phoenix.pid"
+
+# Wait for Phoenix to be ready
 $PhoenixReady = Test-ComponentReadiness -ComponentName "Arize Phoenix" -Port $env:PHOENIX_PORT
 
 # --- Spoke 2: Model Gateway Proxy (LiteLLM) ---
-$LiteLLMReady = $false
 if ($PhoenixReady) {
-    Write-Host "Launching Model Gateway Proxy..." -ForegroundColor Gray
-    & "$BinDir\Run-LiteLLM.ps1"
+    Write-Host "Launching Model Gateway Proxy (Background)..." -ForegroundColor Gray
+    $LiteArgs = "-NoProfile -ExecutionPolicy Bypass -Command `. '$BinDir\..\config\env.ps1'; & '$BinDir\Run-LiteLLM.ps1'"
+    $LiteProc = Start-Process -FilePath "powershell.exe" -ArgumentList $LiteArgs -PassThru -WindowStyle Hidden
+    $LiteProc.Id | Out-File "$TmpDir\litellm.pid"
+    
+    # Wait for LiteLLM to be ready
     $LiteLLMReady = Test-ComponentReadiness -ComponentName "LiteLLM Proxy" -Port $env:LITELLM_PORT
 }
 
