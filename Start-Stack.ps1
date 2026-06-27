@@ -21,6 +21,31 @@ $LiteLLMErrLog = "$LogDir\litellm.err"
 $PhoenixPidFile = "$TmpDir\phoenix.pid"
 $LiteLLMPidFile = "$TmpDir\litellm.pid"
 
+# ==========================================
+# NEW: AUTOMATIC LOG ROLLING SEQUENCE
+# ==========================================
+# Generate a clean timestamp string: YYYYMMDD_HHMMSS
+$Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+
+# Target file maps for clean rolling
+$LogsToRoll = @(
+    @{ Active = $PhoenixLog; Archive = "$LogDir\phoenix_$Timestamp.log" },
+    @{ Active = $LiteLLMLog;  Archive = "$LogDir\litellm_$Timestamp.log" }
+)
+
+foreach ($LogFile in $LogsToRoll) {
+    if (Test-Path $LogFile.Active) {
+        try {
+            # Safely move the file to a timestamped history profile
+            Move-Item -Path $LogFile.Active -Destination $LogFile.Archive -Force -ErrorAction Stop
+        } catch {
+            # In case an underlying system lock is lingering, fall back gracefully to a copy-clear structure
+            Copy-Item -Path $LogFile.Active -Destination $LogFile.Archive -Force
+            Clear-Content -Path $LogFile.Active -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # Set network environment bypass variables
 $env:NO_PROXY="127.0.0.1,localhost"
 $env:no_proxy="127.0.0.1,localhost"
