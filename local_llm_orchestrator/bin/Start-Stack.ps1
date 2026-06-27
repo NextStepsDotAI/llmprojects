@@ -1,86 +1,88 @@
 # ========================================================================
-# 1. ENVIRONMENT & CONTEXT ROUTING (ISOLATED WORKSPACE INHERITANCE)
+# 1. PLATFORM CONFIGURATION & ENVIRONMENT ENVIRONMENT MAPPINGS
 # ========================================================================
-# Since this script resides inside the \bin subfolder, establish the parent 
-# directory as the primary executing root workspace context.
 $BinDir = $PSScriptRoot
 $WorkingDir = Split-Path -Parent $BinDir
-Set-Location $WorkingDir
-
-$LogDir = "$WorkingDir\log"
 $TmpDir = "$WorkingDir\tmp"
+$LogDir = "$WorkingDir\log"
 
-# Define component log targets
-$PhoenixLog = "$LogDir\phoenix.log"
-$LiteLLMLog = "$LogDir\litellm.log"
-$Timestamp  = Get-Date -Format "yyyyMMdd_HHmmss"
+# Clean baseline dynamic folder setup
+if (-not (Test-Path $TmpDir)) { New-Item -ItemType Directory -Path $TmpDir | Out-Null }
+if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out-Null }
 
-Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host " HUB DISPATCHER: INITIATING WORKSPACE OPERATIONS   " -ForegroundColor Cyan
-Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "Project Workspace Root: $WorkingDir" -ForegroundColor Gray
+Write-Host "==================================================" -ForegroundColor Green
+Write-Host " STARTUP HUB: INITIALIZING REFACTORED BACKGROUND SPOKES " -ForegroundColor Green
+Write-Host "==================================================" -ForegroundColor Green
 
 # ========================================================================
-# 2. DYNAMIC HISTORICAL LOG ROLLING
+# 2. REUSABLE READINESS PROBE FUNCTION
 # ========================================================================
-# Inspects existing log files. If present, rolls them over into a timestamped 
-# archive before starting new background execution threads.
-$LogsToRoll = @(
-    @{ Active = $PhoenixLog; Archive = "$LogDir\phoenix_$Timestamp.log"; Name = "Arize Phoenix" },
-    @{ Active = $LiteLLMLog;  Archive = "$LogDir\litellm_$Timestamp.log";  Name = "LiteLLM Proxy" }
-)
+function Test-ComponentReadiness {
+    param (
+        [string]$ComponentName,
+        [int]$Port,
+        [int]$MaxRetries = 5,
+        [int]$DelaySeconds = 2
+    )
 
-foreach ($LogSetting in $LogsToRoll) {
-    if (Test-Path $LogSetting.Active) {
-        try {
-            Write-Host "Rolling over active log archive for [$($LogSetting.Name)]..." -ForegroundColor Gray
-            Move-Item -Path $LogSetting.Active -Destination $LogSetting.Archive -Force -ErrorAction Stop
-        } catch {
-            # Fallback if a persistent OS file handles constraint prevents moving
-            Copy-Item -Path $LogSetting.Active -Destination $LogSetting.Archive -Force
-            Clear-Content -Path $LogSetting.Active -ErrorAction SilentlyContinue
+    Write-Host "--> Initiating readiness probe for $ComponentName on port $Port..." -ForegroundColor Cyan
+    $RetryCount = 0
+    $IsReady = $false
+
+    while ($RetryCount -lt $MaxRetries) {
+        # Check if the port is actively accepting connections
+        $Connection = Test-NetConnection -ComputerName localhost -Port $Port -InformationLevel Quiet
+        
+        if ($Connection) {
+            $IsReady = $true
+            break
         }
+
+        $RetryCount++
+        Write-Host "    [Attempt $RetryCount/$MaxRetries] Port $Port not responding yet. Retrying in $DelaySeconds seconds..." -ForegroundColor Yellow
+        Start-Sleep -Seconds $DelaySeconds
+    }
+
+    if ($IsReady) {
+        Write-Host "✔ $ComponentName is fully live, responsive, and bound to port $Port." -ForegroundColor Green
+        return $true
+    } else {
+        Write-Error "✖ Critical: $ComponentName failed readiness probe on port $Port within the timeout window."
+        return $false
     }
 }
 
+# Track the primary orchestrator container handle 
+$ParentPid = $PID
+$ParentPid | Out-File "$TmpDir\orchestrator.pid" -Encoding ascii
+
 # ========================================================================
-# 3. DECOUPLED INDEPENDENT COMPONENT SPOKE DISPATCH
+# 3. SPOKE INVOCATIONS WITH HEALTH PROBING
 # ========================================================================
+# Explicitly load environment definitions first to ensure values exist in the parent loop
+. "$BinDir\..\config\env.ps1"
 
-# --- SPOKE 1: ARIZE PHOENIX RUNTIME ---
-$PhoenixScript = "$BinDir\Run-Phoenix.ps1"
-if (Test-Path $PhoenixScript) {
-    Write-Host "Hub Status: Launching isolated Phoenix telemetry spoke..." -ForegroundColor Yellow
-    
-    # Fire the script in a detached background PowerShell context using system bypass rules
-    Start-Process -FilePath "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PhoenixScript`"" -NoNewWindow
-    Write-Host "✔ Hub Status: Phoenix execution signal transmitted." -ForegroundColor Green
-} else {
-    Write-Host "❌ Hub Error: Missing operational component: $PhoenixScript" -ForegroundColor Red
-}
+# --- Spoke 1: Telemetry Dashboard (Phoenix) ---
+Write-Host "Launching Telemetry Engine..." -ForegroundColor Gray
+& "$BinDir\Run-Phoenix.ps1"
+$PhoenixReady = Test-ComponentReadiness -ComponentName "Arize Phoenix" -Port $env:PHOENIX_PORT
 
-# Brief pause to allow the Phoenix server socket sequence to claim port 6006 cleanly
-Start-Sleep -Seconds 2
-
-# --- SPOKE 2: LITELLM GATEWAY ROUTER ---
-$LiteLLMScript = "$BinDir\Run-LiteLLM.ps1"
-if (Test-Path $LiteLLMScript) {
-    Write-Host "Hub Status: Launching isolated LiteLLM gateway proxy spoke..." -ForegroundColor Yellow
-    
-    # Fire the script in a detached background PowerShell context using system bypass rules
-    Start-Process -FilePath "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$LiteLLMScript`"" -NoNewWindow
-    Write-Host "✔ Hub Status: LiteLLM proxy execution signal transmitted." -ForegroundColor Green
-} else {
-    Write-Host "❌ Hub Error: Missing operational component: $LiteLLMScript" -ForegroundColor Red
+# --- Spoke 2: Model Gateway Proxy (LiteLLM) ---
+if ($PhoenixReady) {
+    Write-Host "Launching Model Gateway Proxy..." -ForegroundColor Gray
+    & "$BinDir\Run-LiteLLM.ps1"
+    $LiteLLMReady = Test-ComponentReadiness -ComponentName "LiteLLM Proxy" -Port $env:LITELLM_PORT
 }
 
 # ========================================================================
-# 4. DISPATCH COMPLETE - CLEAN DISENGAGEMENT
+# 4. FINALIZATION
 # ========================================================================
-Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "All background thread handoffs successful." -ForegroundColor White
-Write-Host "Tracking structures populated under \tmp" -ForegroundColor White
-Write-Host "Operational timelines running inside \log" -ForegroundColor White
-Write-Host "==================================================" -ForegroundColor Cyan
-Start-Sleep -Seconds 2
-Exit
+if ($PhoenixReady -and $LiteLLMReady) {
+    Write-Host "==================================================" -ForegroundColor Green
+    Write-Host "All background components verified healthy. Workspace ready!" -ForegroundColor Green
+    Write-Host "==================================================" -ForegroundColor Green
+} else {
+    Write-Host "==================================================" -ForegroundColor Red
+    Write-Warning "Workspace initialization incomplete. One or more services failed to start properly."
+    Write-Host "==================================================" -ForegroundColor Red
+}

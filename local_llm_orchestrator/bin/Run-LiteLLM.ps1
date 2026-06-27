@@ -1,38 +1,15 @@
-# ========================================================================
-# 1. ENVIRONMENT & CONTEXT ROUTING (ISOLATED WORKSPACE INHERITANCE)
-# ========================================================================
-# Inherit execution context from the parent hub and map isolated subdirectories
-$BinDir = $PSScriptRoot
-$WorkingDir = Split-Path -Parent $BinDir
+# bin\Run-LiteLLM.ps1
+# Import the environmental variables safely from configuration boundaries
+. "$PSScriptRoot\..\config\env.ps1"
 
-$LogDir = "$WorkingDir\log"
-$TmpDir = "$WorkingDir\tmp"
-$ConfigDir = "$WorkingDir\config"
+$LogDir = "$PSScriptRoot\..\log"
+$TmpDir = "$PSScriptRoot\..\tmp"
 
-$LiteLLMLog = "$LogDir\litellm.log"
-$LiteLLMPidFile = "$TmpDir\litellm.pid"
+Write-Host "Initializing LiteLLM Proxy Engine via Port $env:LITELLM_PORT..." -ForegroundColor Cyan
 
-# Force current executing directory context back to project workspace root
-Set-Location $WorkingDir
+# Run LiteLLM leveraging your configured path parameters and environmental credentials
+$Job = Start-Process litellm -ArgumentList "--config", "$env:LITELLM_CONFIG", "--port", $env:LITELLM_PORT -NoNewWindow -PassThru -RedirectStandardOutput "$LogDir\litellm.log" -RedirectStandardError "$LogDir\litellm_errors.log"
 
-# ========================================================================
-# 2. LOCALIZED NETWORK LOOPBACK BYPASS ISOLATION
-# ========================================================================
-# Prevent the local proxy runtime from trying to route traffic through any 
-# system-wide corporate or network proxy blocks when hitting 127.0.0.1
-$env:NO_PROXY = "127.0.0.1,localhost"
-$env:no_proxy = "127.0.0.1,localhost"
-
-# ========================================================================
-# 3. BACKGROUND DESKTOP PROCESS DISPATCH & TRACING
-# ========================================================================
-# Spawns a background command wrapper shell to host the LiteLLM router instance.
-# Maps configuration directly out of the dedicated \config domain directory.
-# Both standard output and detailed debugging traces are piped cleanly to litellm.log.
-$Process = Start-Process -FilePath "cmd" -ArgumentList "/c litellm --config `"$ConfigDir\config.yaml`" --host 127.0.0.1 --port 4000 --detailed_debug >> `"$LiteLLMLog`" 2>&1" `
-    -NoNewWindow -PassThru
-
-# Record the unique operating system Process ID (PID) to the workspace monitoring area
-if ($Process) {
-    $Process.Id | Out-File -FilePath $LiteLLMPidFile -Encoding ascii
+if ($Job) {
+    $Job.Id | Out-File "$TmpDir\litellm.pid" -Encoding ascii
 }

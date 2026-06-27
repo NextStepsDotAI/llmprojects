@@ -1,22 +1,18 @@
 # ========================================================================
 # 1. ENVIRONMENT & DETACHED TEARDOWN CORE CONTEXT
 # ========================================================================
-# Since this script lives inside the \bin subfolder, capture the parent 
-# directory to synchronize tracking across the workspace.
 $BinDir = $PSScriptRoot
 $WorkingDir = Split-Path -Parent $BinDir
 $TmpDir = "$WorkingDir\tmp"
 
 Write-Host "==================================================" -ForegroundColor Magenta
-Write-Host " TEARDOWN HUB: SWEEPING COMPONENT STACK ENVIRONMENTS " -ForegroundColor Magenta
+Write-Host " TEARDOWN HUB: GRACEFUL COMPONENT STACK ENVIRONMENTS " -ForegroundColor Magenta
 Write-Host "==================================================" -ForegroundColor Magenta
 Write-Host "Scanning workspace target tracking directory: $TmpDir" -ForegroundColor Gray
 
 # ========================================================================
-# 2. DYNAMIC WORKSPACE COMPONENT TREE ELIMINATION
+# 2. DYNAMIC TWO-STAGE PROCESS TEARDOWN (GRACEFUL -> FORCEFUL)
 # ========================================================================
-# Inspects the tmp/ directory dynamically. This allows adding new component 
-# spokes without rewriting the teardown script.
 if (Test-Path "$TmpDir\*.pid") {
     $PidFiles = Get-ChildItem -Path "$TmpDir\*.pid"
     
@@ -26,15 +22,36 @@ if (Test-Path "$TmpDir\*.pid") {
         
         $PidValue = (Get-Content $File.FullName).Trim()
         if ($PidValue) {
-            Write-Host "Evaluating active tracking register: [$($File.Name)] -> Target Process ID: $PidValue" -ForegroundColor Yellow
+            Write-Host "Evaluating active tracking register: [$($File.Name)] -> Target PID: $PidValue" -ForegroundColor Yellow
             
             # Cross-reference with live OS process records
-            if (Get-Process -Id $PidValue -ErrorAction SilentlyContinue) {
-                Write-Host "Executing cascading tree kill on root wrapper PID $PidValue and all child worker daemons..." -ForegroundColor DarkYellow
+            $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
+            
+            if ($Process) {
+                # --- STAGE 1: Graceful Close ---
+                Write-Host "Stage 1: Issuing close signal to PID $PidValue (allowing data flushing)..." -ForegroundColor Cyan
                 
-                # Enforce deep forceful tree teardown via taskkill (/T /F) to unlock ports
-                taskkill /PID $PidValue /T /F | Out-Null
-                Write-Host "✔ Cleaned up component process architecture successfully." -ForegroundColor Green
+                # CloseMainWindow tells GUI apps to close, while letting CLI apps process standard exit signals.
+                # Stop-Process without -Force behaves gracefully where supported.
+                $Process.CloseMainWindow() | Out-Null
+                $Process | Stop-Process -ErrorAction SilentlyContinue
+                
+                # Wait for up to 3 seconds for the process to exit cleanly
+                $TimeoutSec = 3
+                $ElapsedSec = 0
+                while ((Get-Process -Id $PidValue -ErrorAction SilentlyContinue) -and ($ElapsedSec -lt $TimeoutSec)) {
+                    Start-Sleep -Seconds 1
+                    $ElapsedSec++
+                }
+                
+                # --- STAGE 2: Forceful Escalation (If Still Running) ---
+                if (Get-Process -Id $PidValue -ErrorAction SilentlyContinue) {
+                    Write-Warning "PID $PidValue refused to exit within $TimeoutSec seconds. Escalating to forceful tree kill..."
+                    taskkill /PID $PidValue /T /F | Out-Null
+                    Write-Host "✖ Forcefully terminated process tree." -ForegroundColor Red
+                } else {
+                    Write-Host "✔ Component exited gracefully." -ForegroundColor Green
+                }
             } else {
                 Write-Host "Notice: Monitored PID $PidValue has already been terminated." -ForegroundColor Gray
             }
