@@ -13,7 +13,8 @@ Write-Host "Initializing Phoenix Telemetry Engine via Port $env:PHOENIX_PORT..."
 
 # Use a command string to ensure Phoenix is detached and output is consolidated.
 # *> redirects both Standard Output (1) and Standard Error (2) to the log file.
-$PhoenixCommand = "phoenix serve --port $env:PHOENIX_PORT *> '$CombinedLog'"
+# Corrected command: Merge Error (2) into Output (1), then redirect to file
+$PhoenixCommand = "phoenix serve --port $env:PHOENIX_PORT 2>&1 > '$CombinedLog'"
 
 # Use Start-Process with -WindowStyle Hidden to detach the process completely
 $Job = Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -Command &{$PhoenixCommand}" -PassThru -WindowStyle Hidden

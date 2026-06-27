@@ -78,6 +78,10 @@ if ($PhoenixReady) {
     $LiteProc = Start-Process -FilePath "powershell.exe" -ArgumentList $LiteArgs -PassThru -WindowStyle Hidden
     $LiteProc.Id | Out-File "$TmpDir\litellm.pid"
     
+    # CRITICAL: Add this cooldown
+    Write-Host "Waiting 15 seconds for LiteLLM database migrations..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 15
+
     # Wait for LiteLLM to be ready
     $LiteLLMReady = Test-ComponentReadiness -ComponentName "LiteLLM Proxy" -Port $env:LITELLM_PORT
 }
