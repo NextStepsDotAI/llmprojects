@@ -1,0 +1,5 @@
+INFO:     Started server process [19124]
+INFO:     Waiting for application startup.
+boto3 is installed but aioboto3 is not. To use AWS Bedrock models in Playground, install aioboto3: pip install aioboto3
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:6006 (Press CTRL+C to quit)

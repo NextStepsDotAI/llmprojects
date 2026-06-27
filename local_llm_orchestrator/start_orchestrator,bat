@@ -1,46 +1,47 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: 1. ESTABLISH COMPONENT PATHS
-set "WORKING_DIR=%~dp0"
-set "TMP_DIR=%WORKING_DIR%tmp"
-set "LOG_DIR=%WORKING_DIR%log"
+:: 1. SET EXPLICIT WORKSPACE PROJECT PATH CONTEXT
+set "PROJECT_DIR=%~dp0"
+set "TMP_DIR=%PROJECT_DIR%tmp"
+set "LOG_DIR=%PROJECT_DIR%log"
+set "ENV_DIR=%PROJECT_DIR%env"
+set "CONFIG_DIR=%PROJECT_DIR%config"
+set "SPEC_DIR=%PROJECT_DIR%specification"
 
+:: 2. AUTO-GENERATE REQUIRED MISSING ISOLATED DOMAINS
 if not exist "%TMP_DIR%" mkdir "%TMP_DIR%"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+if not exist "%ENV_DIR%" mkdir "%ENV_DIR%"
+if not exist "%CONFIG_DIR%" mkdir "%CONFIG_DIR%"
+if not exist "%SPEC_DIR%" mkdir "%SPEC_DIR%"
 
-:: 2. LOG THE ULTIMATE PARENT PID (This Batch Execution Context)
+:: 3. LOG THE PARENT ORCHESTRATOR PID TO PREVENT SELF-LOCKING
 powershell -NoProfile -Command "[String]$parent = (Get-CimInstance Win32_Process -Filter \"ProcessId = $PID\").ParentProcessId; $parent | Out-File -FilePath '%TMP_DIR%\orchestrator.pid' -Encoding ascii"
 
-:: 3. DYNAMIC AMBIENT CONCURRENCY CHECK BASED ON TRACKED PID FILES
+:: 4. DYNAMIC AMBIENT CONCURRENCY CHECK FROM TMP FILE TRACKING
 set STACK_RUNNING=0
 
 if exist "%TMP_DIR%\*.pid" (
-    echo Checking tracked application instances...
-    
     for %%F in ("%TMP_DIR%\*.pid") do (
         if not "%%~nxF"=="orchestrator.pid" (
             set /p TARGET_PID=<"%%F"
-            
-            :: Check if the specific PID from the tracking file is alive in the OS task list
             tasklist /FI "PID eq !TARGET_PID!" 2>NUL | findstr /I "!TARGET_PID!" >NUL
             if !errorlevel! equ 0 (
                 set STACK_RUNNING=1
-                echo [BLOCKER DETECTED] File: %%~nxF manages an active Process Tree on PID: !TARGET_PID!
+                echo [CONFLICT DETECTED] File %%~nxF shows an active process tree is already running on PID: !TARGET_PID!
             )
         )
     )
 )
 
-:: 4. IF VALIDATED RUNTIME CONFLICTS ARE PRESENT, DUMP TOPOLOGY & STOP
+:: 5. BLOCK STARTUP IF ACTIVE SYSTEM BLOCKERS RECOVERED
 if !STACK_RUNNING! equ 1 (
     echo.
     echo ========================================================================
-    echo BLOCKING STARTUP: TRACKED PROCESSES ALREADY RUNNING
+    echo BLOCKING STARTUP: STACK PROCESSES DETECTED IN ACTIVE ENVIRONMENT
     echo ========================================================================
-    echo The orchestrator stopped this launch to prevent deadlocks.
-    echo.
-    echo Active Component Processes (Filtered by PID Files):
+    echo Current System Blockers Found:
     for %%F in ("%TMP_DIR%\*.pid") do (
         if not "%%~nxF"=="orchestrator.pid" (
             set /p T_PID=<"%%F"
@@ -55,5 +56,5 @@ if !STACK_RUNNING! equ 1 (
     exit /b
 )
 
-:: 5. LAUNCH CHILD AUTOMATION
-powershell -NoProfile -ExecutionPolicy Bypass -File "%WORKING_DIR%Start-Stack.ps1" > "%LOG_DIR%\orchestrator_start.log" 2>&1
+:: 6. LAUNCH CENTRAL HUB DISPATCHER ROUTED OUT OF SUBORDINATE BIN DIRECTORY
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%bin\Start-Stack.ps1" > "%LOG_DIR%\orchestrator_start.log" 2>&1
