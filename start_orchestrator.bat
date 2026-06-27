@@ -1,1 +1,2 @@
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start-Stack.ps1"
+@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start-Stack.ps1" > "%~dp0log\orchestrator_start.log" 2>&1

@@ -12,22 +12,50 @@ $TmpDir = "$WorkingDir\tmp"
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out-Null }
 if (-not (Test-Path $TmpDir)) { New-Item -ItemType Directory -Path $TmpDir | Out-Null }
 
-# Re-route Log and PID configurations to their designated targets
+$PhoenixPidFile = "$TmpDir\phoenix.pid"
+$LiteLLMPidFile = "$TmpDir\litellm.pid"
+
+# ==========================================
+# STRICT CONCURRENCY CHECK (PREVENT RE-SPAWN)
+# ==========================================
+$IsAlreadyRunning = $false
+
+# 1. Check if Phoenix is active
+if (Test-Path $PhoenixPidFile) {
+    $OldPhoenixPid = (Get-Content $PhoenixPidFile).Trim()
+    if ($OldPhoenixPid -and (Get-Process -Id $OldPhoenixPid -ErrorAction SilentlyContinue)) {
+        Write-Host "🛑 Access Denied: Arize Phoenix is already running on PID $OldPhoenixPid." -ForegroundColor Red
+        $IsAlreadyRunning = $true
+    }
+}
+
+# 2. Check if LiteLLM is active
+if (Test-Path $LiteLLMPidFile) {
+    $OldLiteLLMPid = (Get-Content $LiteLLMPidFile).Trim()
+    if ($OldLiteLLMPid -and (Get-Process -Id $OldLiteLLMPid -ErrorAction SilentlyContinue)) {
+        Write-Host "🛑 Access Denied: LiteLLM Proxy is already running on PID $OldLiteLLMPid." -ForegroundColor Red
+        $IsAlreadyRunning = $true
+    }
+}
+
+# Abort execution if any active instances exist
+if ($IsAlreadyRunning) {
+    Write-Host "--------------------------------------------------" -ForegroundColor Yellow
+    Write-Host "Please run 'shutdown_orchestrator.bat' to stop the current instance before restarting." -ForegroundColor Yellow
+    Write-Host "Exiting launcher in 5 seconds..." -ForegroundColor Gray
+    Start-Sleep -Seconds 5
+    Exit
+}
+
+# ==========================================
+# AUTOMATIC LOG ROLLING SEQUENCE
+# ==========================================
 $PhoenixLog    = "$LogDir\phoenix.log"
 $PhoenixErrLog = "$LogDir\phoenix.err"
 $LiteLLMLog    = "$LogDir\litellm.log"
 $LiteLLMErrLog = "$LogDir\litellm.err"
 
-$PhoenixPidFile = "$TmpDir\phoenix.pid"
-$LiteLLMPidFile = "$TmpDir\litellm.pid"
-
-# ==========================================
-# NEW: AUTOMATIC LOG ROLLING SEQUENCE
-# ==========================================
-# Generate a clean timestamp string: YYYYMMDD_HHMMSS
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-
-# Target file maps for clean rolling
 $LogsToRoll = @(
     @{ Active = $PhoenixLog; Archive = "$LogDir\phoenix_$Timestamp.log" },
     @{ Active = $LiteLLMLog;  Archive = "$LogDir\litellm_$Timestamp.log" }
@@ -36,10 +64,8 @@ $LogsToRoll = @(
 foreach ($LogFile in $LogsToRoll) {
     if (Test-Path $LogFile.Active) {
         try {
-            # Safely move the file to a timestamped history profile
             Move-Item -Path $LogFile.Active -Destination $LogFile.Archive -Force -ErrorAction Stop
         } catch {
-            # In case an underlying system lock is lingering, fall back gracefully to a copy-clear structure
             Copy-Item -Path $LogFile.Active -Destination $LogFile.Archive -Force
             Clear-Content -Path $LogFile.Active -ErrorAction SilentlyContinue
         }
@@ -58,7 +84,6 @@ Write-Host "==================================================" -ForegroundColor
 Write-Host " STARTING AI DEVELOPMENT STACK (BACKGROUND MODE) " -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 
-# Clean up stale pid/error structures inside our subfolders
 Remove-Item $PhoenixPidFile, $LiteLLMPidFile, $PhoenixErrLog, $LiteLLMErrLog -ErrorAction SilentlyContinue
 
 # ==========================================
@@ -78,7 +103,6 @@ if ($PhoenixProcess) {
     Write-Host "❌ Failed to start Phoenix." -ForegroundColor Red
 }
 
-# Brief pause to let Phoenix claim its socket before LiteLLM binds
 Start-Sleep -Seconds 2
 
 # ==========================================
@@ -105,9 +129,7 @@ Write-Host "--------------------------------------------------" -ForegroundColor
 Write-Host "All processes are running silently in the background." -ForegroundColor White
 Write-Host "Outputs are structured under \log and \tmp subfolders." -ForegroundColor White
 
-for ($i = 5; $i -gt 0; $i--) {
-    Write-Host "`rThis orchestrator console will close automatically in $i seconds... " -NoNewline -ForegroundColor Gray
-    Start-Sleep -Seconds 1
-}
+# Force a brief pause so the console output can be read if launched interactively
+Start-Sleep -Seconds 5
 
 Exit
