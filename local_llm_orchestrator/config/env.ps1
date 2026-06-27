@@ -1,6 +1,9 @@
 # ========================================================================
 # CENTRALIZED DESKTOP ENVIRONMENT CONFIGURATION & REGISTRY (config\env.ps1)
 # ========================================================================
+# Force Python to use UTF-8 encoding to avoid UnicodeEncodeError in LiteLLM
+$env:PYTHONIOENCODING = "utf-8"
+$env:LC_ALL = "en_US.UTF-8"
 
 # --- Component Runtime Ports ---
 $env:PHOENIX_PORT   = 6006
@@ -17,4 +20,4 @@ $env:LITELLM_CONFIG = "$WorkspaceRoot\config\config.yaml"
 $env:OPENAI_API_KEY = "sk-mock-key-for-local-routing-boundaries"
 $env:AWS_REGION     = "us-east-1"
 
-Write-Host "✔ Workspace environment configurations populated successfully." -ForegroundColor Gray
+Write-Host "Workspace environment configurations populated successfully." -ForegroundColor Gray
