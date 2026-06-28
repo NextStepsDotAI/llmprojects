@@ -19,7 +19,15 @@ $env:LITELLM_CONFIG = "$WorkspaceRoot\config\config.yaml"
 # Keep this file out of your main git pushes if secrets are added!
 $env:OPENAI_API_KEY = "sk-mock-key-for-local-routing-boundaries"
 $env:AWS_REGION     = "us-east-1"
-$env:LITELLM_LOG="DEBUG"     
+$env:LITELLM_LOG = "DEBUG"     
 #$env:PRISMA_SCHEMA_PATH = "D:\llm_project\local_llm_orchestrator\prisma\schema.prisma"
 $env:DATABASE_URL="postgresql://postgres:Password123@127.0.0.1:5432/litellm?pool_timeout=60&connection_limit=10"
+
+$env:PRISMA_QUERY_ENGINE_BINARY = "C:\Users\nextstep.ai\.cache\prisma-python\binaries\5.17.0\393aa359c9ad4a4bb28630fb5613f9c281cde053\node_modules\prisma\query-engine-windows.exe"
+# Give Prisma query engine more time to start its HTTP listener
+$env:PRISMA_QUERY_ENGINE_BINARY_TIMEOUT = 60
+$env:PRISMA_CLIENT_CONNECT_TIMEOUT = 30
+
+# Force Prisma to use binary engine (not library engine) — more stable on Windows
+$env:PRISMA_CLIENT_ENGINE_TYPE = "binary"
 Write-Host "Workspace environment configurations populated successfully." -ForegroundColor Gray

@@ -6,6 +6,12 @@ model_list:
 
 general_settings:
   master_key: sk-master-1234
+  database_connection_pool_limit: 10        # default is too high for local dev
+  database_connection_timeout: 60
+  disable_spend_logs: false
+  health_check_interval: 120
+  # If using SQLite for migrations only, keep Postgres for runtime:
+  use_client_credentials_from_environment_variables: true
   database_url: "postgresql://postgres:Password123@127.0.0.1:5432/litellm?pool_timeout=60&connection_limit=10"
   
   # The definitive production parameters for LiteLLM OpenTelemetry routing

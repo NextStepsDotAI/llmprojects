@@ -69,7 +69,7 @@ $PhoenixProc = Start-Process -FilePath "powershell.exe" -ArgumentList $PhoenixAr
 $PhoenixProc.Id | Out-File "$TmpDir\phoenix.pid"
 
 # Wait for Phoenix to be ready
-$PhoenixReady = Test-ComponentReadiness -ComponentName "Arize Phoenix" -Port $env:PHOENIX_PORT
+$PhoenixReady = Test-ComponentReadiness -ComponentName "Arize Phoenix" -Port $env:PHOENIX_PORT -MaxAttempts 20 -RetryDelay 4
 
 # --- Spoke 2: Model Gateway Proxy (LiteLLM) ---
 if ($PhoenixReady) {
