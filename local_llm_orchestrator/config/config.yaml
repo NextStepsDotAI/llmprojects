@@ -6,7 +6,7 @@ model_list:
 
 general_settings:
   master_key: sk-master-1234
-  database_url: "postgresql://postgres:Password123@127.0.0.1:5432/litellm"
+  database_url: "postgresql://postgres:Password123@127.0.0.1:5432/litellm?pool_timeout=60&connection_limit=10"
   
   # The definitive production parameters for LiteLLM OpenTelemetry routing
   litellm_logging:

@@ -19,5 +19,7 @@ $env:LITELLM_CONFIG = "$WorkspaceRoot\config\config.yaml"
 # Keep this file out of your main git pushes if secrets are added!
 $env:OPENAI_API_KEY = "sk-mock-key-for-local-routing-boundaries"
 $env:AWS_REGION     = "us-east-1"
-
+$env:LITELLM_LOG="DEBUG"     
+#$env:PRISMA_SCHEMA_PATH = "D:\llm_project\local_llm_orchestrator\prisma\schema.prisma"
+$env:DATABASE_URL="postgresql://postgres:Password123@127.0.0.1:5432/litellm?pool_timeout=60&connection_limit=10"
 Write-Host "Workspace environment configurations populated successfully." -ForegroundColor Gray
