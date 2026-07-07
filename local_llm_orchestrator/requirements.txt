@@ -1,0 +1,21 @@
+# ================================================================
+# local_llm_orchestrator - Pinned Requirements
+# Python 3.11 required (use env\.venv)
+# Install: pip install -r requirements.txt
+# ================================================================
+
+# LiteLLM proxy - pinned to last known working version
+# NOTE: 1.90.x introduced a breaking change where Prisma startup
+# failures cause immediate shutdown instead of warning and continuing.
+# Do not upgrade past 1.72.x without testing on Windows first.
+litellm[proxy]==1.72.6
+
+# Observability
+arize-phoenix
+
+# OpenTelemetry
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http
+
+# Prisma (database ORM for LiteLLM)
+prisma

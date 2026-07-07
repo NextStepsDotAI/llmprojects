@@ -9,9 +9,18 @@ if (Test-Path $CombinedLog) { Remove-Item $CombinedLog }
 
 Write-Host "Initializing LiteLLM Proxy Engine via Port $env:LITELLM_PORT..." -ForegroundColor Cyan
 
-# Use 2>&1 to merge Error (2) into Output (1), then redirect (>) to the file.
-# This prevents the 'NativeCommandError' because PowerShell no longer sees these as separate streams.
-$LiteCommand = "litellm --config '$env:LITELLM_CONFIG' --port $env:LITELLM_PORT 2>&1 > '$CombinedLog'"
+# FIX: Use explicit venv path instead of bare 'litellm' command
+# This ensures the correct Python environment is always used
+$VenvRoot = "$PSScriptRoot\..\env\.venv"
+$LiteLLMExe = "$VenvRoot\Scripts\litellm.exe"
+
+if (-not (Test-Path $LiteLLMExe)) {
+    Write-Error "LiteLLM executable not found at: $LiteLLMExe"
+    Write-Error "Please ensure the venv is set up: python -m venv env\.venv && pip install litellm[proxy]==1.72.6"
+    exit 1
+}
+
+$LiteCommand = "& '$LiteLLMExe' --config '$env:LITELLM_CONFIG' --port $env:LITELLM_PORT 2>&1 > '$CombinedLog'"
 
 $Job = Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -Command &{$LiteCommand}" -PassThru -WindowStyle Hidden
 

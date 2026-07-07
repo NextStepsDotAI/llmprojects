@@ -21,8 +21,8 @@ function Test-ComponentReadiness {
     param (
         [string]$ComponentName,
         [int]$Port,
-        [int]$MaxRetries = 5,
-        [int]$DelaySeconds = 2
+        [int]$MaxRetries = 20,      # FIX: was 5, increased to 20
+        [int]$DelaySeconds = 4       # FIX: was 2, increased to 4
     )
 
     Write-Host "--> Initiating readiness probe for $ComponentName on port $Port..." -ForegroundColor Cyan
@@ -32,7 +32,7 @@ function Test-ComponentReadiness {
     while ($RetryCount -lt $MaxRetries) {
         # Check if the port is actively accepting connections
         $Connection = Test-NetConnection -ComputerName localhost -Port $Port -InformationLevel Quiet
-        
+
         if ($Connection) {
             $IsReady = $true
             break
@@ -52,7 +52,7 @@ function Test-ComponentReadiness {
     }
 }
 
-# Track the primary orchestrator container handle 
+# Track the primary orchestrator container handle
 $ParentPid = $PID
 $ParentPid | Out-File "$TmpDir\orchestrator.pid" -Encoding ascii
 
@@ -68,8 +68,8 @@ $PhoenixArgs = "-NoProfile -ExecutionPolicy Bypass -Command `. '$BinDir\..\confi
 $PhoenixProc = Start-Process -FilePath "powershell.exe" -ArgumentList $PhoenixArgs -PassThru -WindowStyle Hidden
 $PhoenixProc.Id | Out-File "$TmpDir\phoenix.pid"
 
-# Wait for Phoenix to be ready
-$PhoenixReady = Test-ComponentReadiness -ComponentName "Arize Phoenix" -Port $env:PHOENIX_PORT -MaxAttempts 20 -RetryDelay 4
+# FIX: Use correct parameter names matching the function signature
+$PhoenixReady = Test-ComponentReadiness -ComponentName "Arize Phoenix" -Port $env:PHOENIX_PORT -MaxRetries 20 -DelaySeconds 4
 
 # --- Spoke 2: Model Gateway Proxy (LiteLLM) ---
 if ($PhoenixReady) {
@@ -77,13 +77,13 @@ if ($PhoenixReady) {
     $LiteArgs = "-NoProfile -ExecutionPolicy Bypass -Command `. '$BinDir\..\config\env.ps1'; & '$BinDir\Run-LiteLLM.ps1'"
     $LiteProc = Start-Process -FilePath "powershell.exe" -ArgumentList $LiteArgs -PassThru -WindowStyle Hidden
     $LiteProc.Id | Out-File "$TmpDir\litellm.pid"
-    
-    # CRITICAL: Add this cooldown
-    Write-Host "Waiting 15 seconds for LiteLLM database migrations..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 15
+
+    # Allow time for LiteLLM database migrations to complete
+    Write-Host "Waiting 20 seconds for LiteLLM database migrations..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 20
 
     # Wait for LiteLLM to be ready
-    $LiteLLMReady = Test-ComponentReadiness -ComponentName "LiteLLM Proxy" -Port $env:LITELLM_PORT
+    $LiteLLMReady = Test-ComponentReadiness -ComponentName "LiteLLM Proxy" -Port $env:LITELLM_PORT -MaxRetries 15 -DelaySeconds 3
 }
 
 # ========================================================================
@@ -91,7 +91,6 @@ if ($PhoenixReady) {
 # ========================================================================
 if ($PhoenixReady -and $LiteLLMReady) {
     Write-Host "ALL SYSTEMS GO: Workspace verified healthy." -ForegroundColor Green
-}
-else {
+} else {
     Write-Warning "CRITICAL: Workspace initialization incomplete."
 }
