@@ -4,26 +4,14 @@ model_list:
       model: ollama/qwen2.5-coder:0.5b
       api_base: http://localhost:11434
 
+litellm_settings:
+  callbacks: ["otel"]
+
 general_settings:
   master_key: sk-master-1234
-  database_connection_pool_limit: 10        # default is too high for local dev
+  database_connection_pool_limit: 10
   database_connection_timeout: 60
   disable_spend_logs: false
   health_check_interval: 120
-  # If using SQLite for migrations only, keep Postgres for runtime:
   use_client_credentials_from_environment_variables: true
   database_url: "postgresql://postgres:Password123@127.0.0.1:5432/litellm?pool_timeout=60&connection_limit=10"
-
-litellm_settings:
-  success_callback: ["opentelemetry"]
-  failure_callback: ["opentelemetry"]
-  opentelemetry:
-    otlp_endpoint: "http://127.0.0.1:6006/v1/traces"
-
-
-  # # The definitive production parameters for LiteLLM OpenTelemetry routing
-  # litellm_logging:
-  #   - opentelemetry
-    
-  # Directs the OpenTelemetry exporter to hit your local Phoenix gRPC collector port
-  #otel_exporter_otlp_endpoint: "http://127.0.0.1:6006/v1/traces"
