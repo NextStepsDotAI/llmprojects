@@ -12,7 +12,7 @@ if (Test-Path $CombinedLog) { Remove-Item $CombinedLog }
 Write-Host "Initializing Phoenix Telemetry Engine via Port $env:PHOENIX_PORT..." -ForegroundColor Cyan
 
 # FIX: Use explicit venv path instead of bare 'phoenix' command
-$VenvRoot = "$PSScriptRoot\..\env\.venv"
+$VenvRoot = "$PSScriptRoot\..\env\.venv-phoenix"
 $PhoenixExe = "$VenvRoot\Scripts\phoenix.exe"
 
 if (-not (Test-Path $PhoenixExe)) {
@@ -29,3 +29,4 @@ $Job = Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -Comma
 if ($Job) {
     $Job.Id | Out-File "$TmpDir\phoenix.pid" -Encoding ascii
 }
+

@@ -31,5 +31,8 @@ $env:PRISMA_CLIENT_CONNECT_TIMEOUT = "30"
 
 # FIX: Value must be quoted string, not bare word
 $env:PRISMA_CLIENT_ENGINE_TYPE = "binary"
+$env:OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+$env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:6006/v1/traces"
+$env:OTEL_TRACES_SAMPLER = "always_on"
 
 Write-Host "Workspace environment configurations populated successfully." -ForegroundColor Gray
