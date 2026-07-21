@@ -1,13 +1,13 @@
 # Local LLM Orchestrator — Installation Guide
 
-A local AI development stack running Ollama (Qwen LLM) + LiteLLM (proxy/gateway) + Arize Phoenix (observability), with full OpenTelemetry tracing and Continue.dev integration for VS Code.
+A local AI development stack running Ollama (Qwen LLM) + LiteLLM (proxy/gateway) + Arize Phoenix (observability), with full OpenTelemetry tracing and VS Code integration (both native LLM support and Continue.dev extension).
 
 ---
 
 ## Architecture Overview
 
 ```
-Continue.dev (VS Code)
+VS Code Built-in Chat / Continue.dev
     │
     ▼
 LiteLLM Proxy (port 4000)          ← OpenAI-compatible API gateway
@@ -299,7 +299,49 @@ Invoke-RestMethod -Uri "http://localhost:4000/chat/completions" `
 
 ---
 
-## Continue.dev Integration (VS Code)
+## VS Code Integration
+
+Two options are available — VS Code's built-in LLM support (no extension needed) or the Continue.dev extension. Both work with the same LiteLLM backend.
+
+### Option A — VS Code Built-in LLM Support (Recommended)
+
+VS Code has native LLM/chat support built in (no extension required). Configure it via VS Code settings JSON:
+
+```json
+[
+    {
+        "name": "Local_SLM",
+        "vendor": "customendpoint",
+        "apiKey": "sk-master-1234",
+        "models": [
+            {
+                "id": "qwen-local",
+                "name": "qwen2.5-coder:0.5b",
+                "url": "http://localhost:4000/v1",
+                "toolCalling": true,
+                "vision": true,
+                "maxInputTokens": 128000,
+                "maxOutputTokens": 16000
+            }
+        ]
+    }
+]
+```
+
+> **Note on `toolCalling` and `vision`:**
+> - **Tool Calling** — allows the LLM to call external tools/functions (run code, search files, execute commands)
+> - **Vision** — allows the LLM to analyze images
+> - `qwen2.5-coder:0.5b` **does not actually support either** — it's a small text-only coding model
+> - These must be set to `true` anyway because VS Code filters the model list by declared capabilities — without them the model won't appear in the chat UI
+> - LiteLLM's `drop_params: true` silently drops any unsupported parameters before they reach Ollama, so no errors occur
+
+> **`url` must include `/v1`** — VS Code's built-in chat requires the full path `http://localhost:4000/v1`, unlike Continue.dev which uses `http://localhost:4000` without it.
+
+Traces from VS Code built-in chat appear in Phoenix automatically at http://localhost:6006.
+
+---
+
+### Option B — Continue.dev Extension
 
 Install the Continue.dev extension, then configure `~/.continue/config.yaml`:
 
@@ -327,6 +369,18 @@ models:
 
 ---
 
+### Comparison
+
+| | VS Code Built-in | Continue.dev |
+|--|--|--|
+| Extension required | No | Yes |
+| `apiBase` format | `http://localhost:4000/v1` | `http://localhost:4000` |
+| Config location | VS Code settings JSON | `~/.continue/config.yaml` |
+| Phoenix tracing | ✅ | ✅ |
+| Direct Ollama option | No | Yes (`qwen-local-no-trace`) |
+
+---
+
 ## Observability
 
 - **Phoenix UI:** http://localhost:6006 — view all LLM traces, spans, token usage
@@ -348,8 +402,12 @@ Traces appear in Phoenix automatically for every request routed through LiteLLM 
 **Fix:** The readiness probe allows up to 80 seconds (20 retries × 4 seconds). If it still fails, check `log\phoenix_combined.log` for import errors.
 
 ### `parallel_tool_calls` unsupported error
-**Cause:** Continue.dev sends OpenAI-specific parameters that Ollama doesn't support.
+**Cause:** VS Code or Continue.dev sends OpenAI-specific parameters that Ollama doesn't support.
 **Fix:** `drop_params: true` in the model's `litellm_params` in `config.yaml`.
+
+### Model not showing in VS Code built-in chat
+**Cause:** VS Code filters models by declared capabilities — models without `toolCalling: true` and `vision: true` are hidden from the chat UI.
+**Fix:** Set both to `true` in the VS Code settings JSON even if the model doesn't actually support them. LiteLLM's `drop_params: true` handles the cleanup silently.
 
 ### No traces in Phoenix
 **Cause:** Wrong OTel env var names or endpoint.
